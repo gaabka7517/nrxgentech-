@@ -8,7 +8,6 @@ import {
   Mail,
   ArrowRight,
   AlertCircle,
-  Sparkles,
   CheckCircle2,
   KeyRound,
   X,
@@ -27,10 +26,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
     updateUserPassword,
     setIsRecoveryMode,
     recoveryError,
-    getCustomAdminEmail,
   } = useAuth();
-
-  const customAdminEmail = getCustomAdminEmail();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -122,17 +118,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
     } finally {
       setResettingPassword(false);
     }
-  };
-
-  const handleQuickDemoFill = () => {
-    if (customAdminEmail) {
-      setEmail(customAdminEmail);
-      setPassword('');
-    } else {
-      setEmail('admin@nexgen.com');
-      setPassword('adminpassword123');
-    }
-    setErrorMessage('');
   };
 
   return (
@@ -286,7 +271,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder={customAdminEmail || "admin@nexgen.com"}
+                      placeholder="admin@example.com"
                       className="block w-full pl-10 pr-3.5 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-[#075A91] focus:border-[#075A91] transition-all"
                     />
                   </div>
@@ -335,27 +320,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
-
-              {/* Quick Demo Credentials shortcut */}
-              <div className="mt-5 p-3 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/60 rounded-xl flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
-                  <Sparkles className="w-3.5 h-3.5 text-[#5ACB00]" />
-                  <span className="font-medium">
-                    {customAdminEmail ? (
-                      <>Admin: <strong className="font-mono">{customAdminEmail}</strong></>
-                    ) : (
-                      <>Default staff: <strong className="font-mono">admin@nexgen.com</strong></>
-                    )}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleQuickDemoFill}
-                  className="text-xs font-bold text-[#075A91] dark:text-sky-400 hover:underline cursor-pointer"
-                >
-                  {customAdminEmail ? 'Use My Email' : 'Auto-fill'}
-                </button>
-              </div>
 
               <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-800 text-center">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Looking to verify a student certificate?</p>

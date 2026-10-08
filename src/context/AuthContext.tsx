@@ -163,19 +163,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 2. Check Custom Local Admin Credentials (configured by administrator in Settings)
+    let hasCustomCreds = false;
     try {
       const rawCustom = localStorage.getItem(CUSTOM_ADMIN_CREDS_KEY);
       if (rawCustom) {
         const customCreds = JSON.parse(rawCustom) as StoredAdminCreds;
-        if (customCreds.email && customCreds.email.toLowerCase() === cleanEmail) {
-          if (!customCreds.passwordHash || customCreds.passwordHash === cleanPass) {
-            setIsAuthenticated(true);
-            setUserEmail(customCreds.email);
-            localStorage.setItem(
-              LOCAL_AUTH_KEY,
-              JSON.stringify({ email: customCreds.email, timestamp: Date.now() })
-            );
-            return { success: true };
+        if (customCreds.email) {
+          hasCustomCreds = true;
+          if (customCreds.email.toLowerCase() === cleanEmail) {
+            if (customCreds.passwordHash && customCreds.passwordHash === cleanPass) {
+              setIsAuthenticated(true);
+              setUserEmail(customCreds.email);
+              localStorage.setItem(
+                LOCAL_AUTH_KEY,
+                JSON.stringify({ email: customCreds.email, timestamp: Date.now() })
+              );
+              return { success: true };
+            }
           }
         }
       }
@@ -183,27 +187,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Error verifying custom admin credentials', e);
     }
 
-    // 3. Environment Variable Admin Credentials
-    const defaultAdminEmail = (import.meta.env.VITE_ADMIN_DEFAULT_EMAIL || 'admin@nexgen.com').toLowerCase();
-    const defaultAdminPass = import.meta.env.VITE_ADMIN_DEFAULT_PASSWORD || 'adminpassword123';
+    // 3. Environment Variable / Default Admin Credentials (only if custom admin not configured)
+    if (!hasCustomCreds) {
+      const defaultAdminEmail = (import.meta.env.VITE_ADMIN_DEFAULT_EMAIL || 'admin@nexgen.com').toLowerCase();
+      const defaultAdminPass = import.meta.env.VITE_ADMIN_DEFAULT_PASSWORD || 'adminpassword123';
 
-    const isDirectMatch =
-      cleanEmail === defaultAdminEmail &&
-      (cleanPass === defaultAdminPass || cleanPass === 'admin123' || cleanPass === 'admin');
-
-    // 4. Default NexGen Staff domain match
-    const isNexGenStaff =
-      (cleanEmail.endsWith('@nexgen.com') || cleanEmail === 'admin@nexgen.com') &&
-      cleanPass.length >= 6;
-
-    if (isDirectMatch || isNexGenStaff) {
-      setIsAuthenticated(true);
-      setUserEmail(cleanEmail);
-      localStorage.setItem(
-        LOCAL_AUTH_KEY,
-        JSON.stringify({ email: cleanEmail, timestamp: Date.now() })
-      );
-      return { success: true };
+      if (cleanEmail === defaultAdminEmail && cleanPass === defaultAdminPass) {
+        setIsAuthenticated(true);
+        setUserEmail(cleanEmail);
+        localStorage.setItem(
+          LOCAL_AUTH_KEY,
+          JSON.stringify({ email: cleanEmail, timestamp: Date.now() })
+        );
+        return { success: true };
+      }
     }
 
     return {
