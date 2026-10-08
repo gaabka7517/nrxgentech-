@@ -20,7 +20,18 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigateVerify }) => {
-  const { login, sendPasswordReset, isRecoveryMode, updateUserPassword, setIsRecoveryMode, recoveryError } = useAuth();
+  const {
+    login,
+    sendPasswordReset,
+    isRecoveryMode,
+    updateUserPassword,
+    setIsRecoveryMode,
+    recoveryError,
+    getCustomAdminEmail,
+  } = useAuth();
+
+  const customAdminEmail = getCustomAdminEmail();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -104,7 +115,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
           onLoginSuccess();
         }, 1500);
       } else {
-        setResetError(res.error || 'Failed to update password.');
+        setResetError(res.error || 'Could not update password.');
       }
     } catch (err: any) {
       setResetError(err.message || 'Error occurred while updating password.');
@@ -114,8 +125,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
   };
 
   const handleQuickDemoFill = () => {
-    setEmail('admin@nexgen.com');
-    setPassword('adminpassword123');
+    if (customAdminEmail) {
+      setEmail(customAdminEmail);
+      setPassword('');
+    } else {
+      setEmail('admin@nexgen.com');
+      setPassword('adminpassword123');
+    }
     setErrorMessage('');
   };
 
@@ -131,7 +147,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
         <div className="flex justify-center mb-5">
           <NexGenLogo size="xl" variant="official" />
         </div>
-
         <h2 className="text-2xl sm:text-3xl font-extrabold text-[#172033] dark:text-white tracking-tight">
           {isRecoveryMode ? 'Set New Password' : 'Admin Portal Login'}
         </h2>
@@ -271,7 +286,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@nexgen.com"
+                      placeholder={customAdminEmail || "admin@nexgen.com"}
                       className="block w-full pl-10 pr-3.5 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-[#075A91] focus:border-[#075A91] transition-all"
                     />
                   </div>
@@ -325,14 +340,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
               <div className="mt-5 p-3 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/60 rounded-xl flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                   <Sparkles className="w-3.5 h-3.5 text-[#5ACB00]" />
-                  <span className="font-medium">Default staff: <strong className="font-mono">admin@nexgen.com</strong></span>
+                  <span className="font-medium">
+                    {customAdminEmail ? (
+                      <>Admin: <strong className="font-mono">{customAdminEmail}</strong></>
+                    ) : (
+                      <>Default staff: <strong className="font-mono">admin@nexgen.com</strong></>
+                    )}
+                  </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleQuickDemoFill}
                   className="text-xs font-bold text-[#075A91] dark:text-sky-400 hover:underline cursor-pointer"
                 >
-                  Auto-fill
+                  {customAdminEmail ? 'Use My Email' : 'Auto-fill'}
                 </button>
               </div>
 

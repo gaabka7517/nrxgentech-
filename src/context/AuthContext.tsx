@@ -12,17 +12,30 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   updateUserPassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  updateAdminCredentials: (
+    email: string,
+    password?: string
+  ) => Promise<{ success: boolean; message?: string; error?: string }>;
+  getCustomAdminEmail: () => string | null;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_AUTH_KEY = 'nexgen_admin_session';
+const CUSTOM_ADMIN_CREDS_KEY = 'nexgen_custom_admin_credentials';
+
+interface StoredAdminCreds {
+  email: string;
+  passwordHash?: string;
+  updatedAt: number;
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
   const [recoveryError, setRecoveryError] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash || '';
@@ -39,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return null;
   });
+
   const [isRecoveryMode, setIsRecoveryMode] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const hash = window.location.hash || '';
@@ -89,12 +103,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (event === 'PASSWORD_RECOVERY') {
           setIsRecoveryMode(true);
         }
-
         if (session) {
           setIsAuthenticated(true);
           setUserEmail(session.user.email || 'Admin');
         } else {
-          // If Supabase signed out and no local override exists
           const stored = localStorage.getItem(LOCAL_AUTH_KEY);
           if (!stored) {
             setIsAuthenticated(false);
@@ -109,6 +121,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const getCustomAdminEmail = (): string | null => {
+    try {
+      const raw = localStorage.getItem(CUSTOM_ADMIN_CREDS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredAdminCreds;
+        return parsed.email || null;
+      }
+    } catch (e) {
+      console.warn('Failed to parse custom admin credentials', e);
+    }
+    return null;
+  };
+
   const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = pass.trim();
@@ -117,7 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Please enter both email and password.' };
     }
 
-    // 1. Try Supabase Auth if configured
+    // 1. Try Supabase Auth if configured and user is in Supabase
     const sb = getSupabase();
     if (sb) {
       try {
@@ -137,7 +162,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Built-in Administrator verification
+    // 2. Check Custom Local Admin Credentials (configured by administrator in Settings)
+    try {
+      const rawCustom = localStorage.getItem(CUSTOM_ADMIN_CREDS_KEY);
+      if (rawCustom) {
+        const customCreds = JSON.parse(rawCustom) as StoredAdminCreds;
+        if (customCreds.email && customCreds.email.toLowerCase() === cleanEmail) {
+          if (!customCreds.passwordHash || customCreds.passwordHash === cleanPass) {
+            setIsAuthenticated(true);
+            setUserEmail(customCreds.email);
+            localStorage.setItem(
+              LOCAL_AUTH_KEY,
+              JSON.stringify({ email: customCreds.email, timestamp: Date.now() })
+            );
+            return { success: true };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error verifying custom admin credentials', e);
+    }
+
+    // 3. Environment Variable Admin Credentials
     const defaultAdminEmail = (import.meta.env.VITE_ADMIN_DEFAULT_EMAIL || 'admin@nexgen.com').toLowerCase();
     const defaultAdminPass = import.meta.env.VITE_ADMIN_DEFAULT_PASSWORD || 'adminpassword123';
 
@@ -145,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cleanEmail === defaultAdminEmail &&
       (cleanPass === defaultAdminPass || cleanPass === 'admin123' || cleanPass === 'admin');
 
+    // 4. Default NexGen Staff domain match
     const isNexGenStaff =
       (cleanEmail.endsWith('@nexgen.com') || cleanEmail === 'admin@nexgen.com') &&
       cleanPass.length >= 6;
@@ -161,8 +208,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return {
       success: false,
-      error: 'Invalid email or password. Use your authorized administrator credentials.',
+      error: 'Email ama Password-ka waa khalad. Fadlan hubi xogtaada ama ku gal Supabase / Settings credentials.',
     };
+  };
+
+  const updateAdminCredentials = async (
+    newEmail: string,
+    newPassword?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> => {
+    const cleanEmail = newEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Fadlan geli email sax ah (Valid email address).' };
+    }
+
+    if (newPassword && newPassword.length < 6) {
+      return { success: false, error: 'Furaha sirta ah (Password) waa inuu ka koobnaadaa ugu yaraan 6 xaraf.' };
+    }
+
+    try {
+      const existingRaw = localStorage.getItem(CUSTOM_ADMIN_CREDS_KEY);
+      let existing: Partial<StoredAdminCreds> = {};
+      if (existingRaw) {
+        try {
+          existing = JSON.parse(existingRaw);
+        } catch {}
+      }
+
+      const updatedCreds: StoredAdminCreds = {
+        email: cleanEmail,
+        passwordHash: newPassword || existing.passwordHash || 'admin123',
+        updatedAt: Date.now(),
+      };
+
+      localStorage.setItem(CUSTOM_ADMIN_CREDS_KEY, JSON.stringify(updatedCreds));
+
+      // Also update currently active session if authenticated
+      setUserEmail(cleanEmail);
+      localStorage.setItem(
+        LOCAL_AUTH_KEY,
+        JSON.stringify({ email: cleanEmail, timestamp: Date.now() })
+      );
+
+      // If Supabase user is logged in and new password provided, try to update Supabase password too
+      const sb = getSupabase();
+      if (sb && newPassword) {
+        try {
+          await sb.auth.updateUser({ password: newPassword });
+        } catch (sbErr) {
+          console.warn('Could not update Supabase password directly:', sbErr);
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Admin Gmail-ka iyo Password-ka cusub si guul leh ayaa loo keydiyey!',
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to save admin credentials.' };
+    }
   };
 
   const sendPasswordReset = async (
@@ -184,7 +287,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!error) {
           return {
             success: true,
-            message: `Password reset instructions have been sent to ${cleanEmail}. Please check your inbox and click the recovery link.`,
+            message: `Password reset link ayaa loo diray ${cleanEmail}. Fadlan ka eeg sanduuqaaga fariimaha (Inbox/Spam).`,
           };
         } else {
           return {
@@ -218,7 +321,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!error) {
           setIsRecoveryMode(false);
           setRecoveryError(null);
-          // clean URL hash
           if (window.history.replaceState) {
             window.history.replaceState(null, '', window.location.pathname);
           }
@@ -231,6 +333,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    // Local fallback
     setIsRecoveryMode(false);
     setRecoveryError(null);
     return { success: true };
@@ -263,6 +366,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         sendPasswordReset,
         updateUserPassword,
+        updateAdminCredentials,
+        getCustomAdminEmail,
         logout,
       }}
     >

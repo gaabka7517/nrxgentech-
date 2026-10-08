@@ -3,13 +3,13 @@ import { dataService } from '../services/dataService';
 import { Course, SystemSettings, VerificationStatus } from '../types';
 import { NexGenLogo } from '../components/NexGenLogo';
 import { DarkModeToggle } from '../components/DarkModeToggle';
+import { useAuth } from '../context/AuthContext';
 import {
   getStoredSupabaseConfig,
   saveStoredSupabaseConfig,
   testSupabaseConnection,
 } from '../lib/supabase';
 import {
-  Settings as SettingsIcon,
   Save,
   CheckCircle2,
   AlertCircle,
@@ -17,13 +17,19 @@ import {
   Plus,
   Trash2,
   BookOpen,
-  Code,
   RotateCcw,
+  Shield,
+  KeyRound,
+  Mail,
+  Lock,
   Sparkles,
   ExternalLink,
+  HelpCircle,
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
+  const { userEmail, updateAdminCredentials, getCustomAdminEmail } = useAuth();
+
   const [settings, setSettings] = useState<SystemSettings>({
     certificate_prefix: 'NEX',
     default_status: 'VALID',
@@ -36,6 +42,14 @@ export const SettingsPage: React.FC = () => {
   const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+
+  // Admin Account & Password State
+  const [adminEmailInput, setAdminEmailInput] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+  const [adminCredsMsg, setAdminCredsMsg] = useState('');
+  const [adminCredsError, setAdminCredsError] = useState('');
+  const [adminCredsLoading, setAdminCredsLoading] = useState(false);
 
   const [savedMessage, setSavedMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -56,8 +70,56 @@ export const SettingsPage: React.FC = () => {
       const cfg = getStoredSupabaseConfig();
       setSupabaseUrl(cfg.url);
       setSupabaseAnonKey(cfg.anonKey);
+
+      // Preload current admin email
+      const customEmail = getCustomAdminEmail();
+      setAdminEmailInput(customEmail || userEmail || 'admin@nexgen.com');
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleSaveAdminCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminCredsMsg('');
+    setAdminCredsError('');
+
+    if (!adminEmailInput.trim() || !adminEmailInput.includes('@')) {
+      setAdminCredsError('Fadlan geli email sax ah (Valid Gmail/Email address).');
+      return;
+    }
+
+    if (adminPasswordInput && adminPasswordInput.length < 6) {
+      setAdminCredsError('Furaha sirta ah (Password) waa inuu ugu yaraan ka koobnaadaa 6 xaraf.');
+      return;
+    }
+
+    if (adminPasswordInput && adminPasswordInput !== adminConfirmPassword) {
+      setAdminCredsError('Labada password isku mid maaha (Passwords do not match).');
+      return;
+    }
+
+    setAdminCredsLoading(true);
+    try {
+      const res = await updateAdminCredentials(
+        adminEmailInput.trim(),
+        adminPasswordInput ? adminPasswordInput.trim() : undefined
+      );
+
+      if (res.success) {
+        setAdminCredsMsg(
+          res.message || 'Xogta Admin-ka (Gmail & Password) si guul leh ayaa loo cusbooneysiiyey!'
+        );
+        setAdminPasswordInput('');
+        setAdminConfirmPassword('');
+        setTimeout(() => setAdminCredsMsg(''), 6000);
+      } else {
+        setAdminCredsError(res.error || 'Cilad ayaa dhacday.');
+      }
+    } catch (err: any) {
+      setAdminCredsError(err.message || 'Cilad ayaa dhacday markii la keydinayay.');
+    } finally {
+      setAdminCredsLoading(false);
     }
   };
 
@@ -98,6 +160,7 @@ export const SettingsPage: React.FC = () => {
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourseName.trim()) return;
+
     try {
       await dataService.addCourse(newCourseName.trim());
       setNewCourseName('');
@@ -110,6 +173,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleDeleteCourse = async (courseId: string, courseName: string) => {
     if (!window.confirm(`Delete course "${courseName}"?`)) return;
+
     try {
       await dataService.deleteCourse(courseId);
       const updated = await dataService.getCourses();
@@ -126,6 +190,7 @@ export const SettingsPage: React.FC = () => {
       )
     )
       return;
+
     await dataService.resetDemoData();
     window.location.reload();
   };
@@ -136,7 +201,7 @@ export const SettingsPage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-black text-[#172033] dark:text-white">System Settings</h1>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          Configure branding, certificate prefixes, courses, theme appearance, and Supabase connection
+          Configure admin credentials, branding, certificate prefixes, courses, appearance, and Supabase connection
         </p>
       </div>
 
@@ -153,6 +218,146 @@ export const SettingsPage: React.FC = () => {
           <span className="font-semibold">{errorMessage}</span>
         </div>
       )}
+
+      {/* 1. Admin Account & Login Credentials Management */}
+      <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200/80 dark:border-gray-800 shadow-xs p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-[#075A91] dark:text-sky-400 flex items-center justify-center">
+              <Shield className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-gray-900 dark:text-white">Admin Account & Login Details</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                U yeel Gmail-kaaga iyo Password-kaaga gaarka ah si aad adigu kaliya ugula soo gasho
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-[#075A91] dark:text-sky-300 px-3 py-1.5 rounded-full border border-blue-100 dark:border-blue-900/60">
+            <KeyRound className="w-3.5 h-3.5 text-[#5ACB00]" />
+            <span>Active Admin: {userEmail || 'admin@nexgen.com'}</span>
+          </span>
+        </div>
+
+        {adminCredsMsg && (
+          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 flex items-start gap-3 text-emerald-800 dark:text-emerald-200 text-xs">
+            <CheckCircle2 className="w-5 h-5 text-[#5ACB00] shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-sm text-emerald-900 dark:text-emerald-100 mb-0.5">Guul!</p>
+              <p>{adminCredsMsg}</p>
+            </div>
+          </div>
+        )}
+
+        {adminCredsError && (
+          <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 flex items-center gap-3 text-rose-800 dark:text-rose-200 text-xs">
+            <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+            <span className="font-semibold">{adminCredsError}</span>
+          </div>
+        )}
+
+        {/* Form to change admin credentials */}
+        <form onSubmit={handleSaveAdminCredentials} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                Admin Gmail / Email
+              </label>
+              <div className="relative rounded-xl shadow-2xs">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  required
+                  value={adminEmailInput}
+                  onChange={(e) => setAdminEmailInput(e.target.value)}
+                  placeholder="tusaale@gmail.com"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-[#075A91]"
+                />
+              </div>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                Email-ka aad u isticmaali doonto login-ka
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                Password Cusub
+              </label>
+              <div className="relative rounded-xl shadow-2xs">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type="password"
+                  value={adminPasswordInput}
+                  onChange={(e) => setAdminPasswordInput(e.target.value)}
+                  placeholder="Furahaaga cusub (ugu yaraan 6)"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-[#075A91]"
+                />
+              </div>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                Kaga tag banaan haddii aadan rabin inaad beddesho furaha
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                Xaqiiji Password-ka
+              </label>
+              <div className="relative rounded-xl shadow-2xs">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type="password"
+                  value={adminConfirmPassword}
+                  onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                  placeholder="Ku celi furahaaga cusub"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-[#075A91]"
+                />
+              </div>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                Ku celi furaha si loo hubiyo
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={adminCredsLoading}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#075A91] to-[#064B79] hover:from-[#064B79] hover:to-[#04385a] text-white text-xs font-bold shadow-md transition-all cursor-pointer disabled:opacity-50"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>{adminCredsLoading ? 'Keydinayaa...' : 'Keydi Gmail-ka & Password-ka'}</span>
+            </button>
+          </div>
+        </form>
+
+        {/* Helpful instructions on Supabase and Vercel for Permanent Cloud Auth */}
+        <div className="mt-4 p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-700 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-gray-800 dark:text-gray-200">
+            <HelpCircle className="w-4 h-4 text-[#075A91] dark:text-sky-400" />
+            <span>Sida loogu xiro Supabase Auth (Si aad mobilo iyo computer kasta ugula gasho):</span>
+          </div>
+          <ol className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5 list-decimal list-inside leading-relaxed pl-1">
+            <li>
+              Gal <strong><a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-[#075A91] dark:text-sky-400 underline">supabase.com</a></strong> &rarr; Mashruucaaga <strong>sysvwhhltlokppdtdmbl</strong>.
+            </li>
+            <li>
+              Dhinaca bidix guji <strong>Authentication</strong> &rarr; kadibna <strong>Users</strong>.
+            </li>
+            <li>
+              Riix badhanka cagaaran ama buluugga ah ee <strong>Add user</strong> &rarr; dooro <strong>Create user</strong>.
+            </li>
+            <li>
+              Geli Gmail-kaaga (tusaale <strong>abdiwahab7517@gmail.com</strong>) iyo <strong>Password-ka aad rabto</strong>, hubi in <em>Auto Confirm User</em> ay shidan tahay, kadibna guji <strong>Create user</strong>.
+            </li>
+          </ol>
+        </div>
+      </div>
 
       {/* Theme & Appearance Card */}
       <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200/80 dark:border-gray-800 shadow-xs p-6 sm:p-8">
@@ -301,7 +506,6 @@ export const SettingsPage: React.FC = () => {
               </p>
             </div>
           </div>
-
           <span
             className={`text-xs font-bold px-3 py-1 rounded-full ${
               supabaseUrl && supabaseAnonKey
@@ -375,7 +579,6 @@ export const SettingsPage: React.FC = () => {
             >
               {isTesting ? 'Testing connection...' : 'Test Connection'}
             </button>
-
             <button
               type="button"
               onClick={handleSaveSettings}
