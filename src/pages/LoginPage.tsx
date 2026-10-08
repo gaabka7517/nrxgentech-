@@ -252,6 +252,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                   <div>
                     <p className="font-semibold">Authentication Error</p>
                     <p className="text-xs text-rose-600 dark:text-rose-400 mt-0.5">{errorMessage}</p>
+                    <div className="mt-2.5 pt-2 border-t border-rose-200/60 dark:border-rose-800/60 text-xs text-rose-700 dark:text-rose-300">
+                      💡 <strong>Talada Admin-ka:</strong> Ku gal <code>abdiwahab7517@gmail.com</code> ama <code>admin@nexgen.com</code> (Password: <code>admin123</code>)
+                    </div>
                   </div>
                 </div>
               )}
@@ -271,7 +274,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@example.com"
+                      placeholder="abdiwahab7517@gmail.com ama admin@nexgen.com"
                       className="block w-full pl-10 pr-3.5 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-[#075A91] focus:border-[#075A91] transition-all"
                     />
                   </div>
