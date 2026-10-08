@@ -1,0 +1,6 @@
+{
+  "name": "NEXGEN TECHNOLOGIES Certificate Management System",
+  "description": "Professional certificate management and instant public verification platform for NexGen Technologies learning center.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
